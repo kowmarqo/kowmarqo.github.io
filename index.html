@@ -435,7 +435,69 @@ let keepMic = true;
 try { const k = localStorage.getItem("lt-keepmic"); if (k === "0") keepMic = false; } catch {}
 
 // iOS only lets a page speak after speech has started from a tap, so prime it silently on the first tap.
+const player = new Audio();
+player.preload = "auto";
+player.setAttribute("playsinline", "");
+const SILENT = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+let playerUnlocked = false;
+
+function unlockPlayer(){
+  if (playerUnlocked) return;
+  player.src = SILENT;
+  const p = player.play();
+  if (p && p.catch) p.catch(() => {});
+  playerUnlocked = true;
+}
+
+function chunkText(text, max){
+  const out = []; let rest = text.trim();
+  while (rest.length > max) {
+    let cut = Math.max(rest.lastIndexOf(". ", max), rest.lastIndexOf(", ", max), rest.lastIndexOf("? ", max), rest.lastIndexOf("! ", max));
+    if (cut < max * 0.4) cut = rest.lastIndexOf(" ", max);
+    if (cut <= 0) cut = max;
+    out.push(rest.slice(0, cut + 1).trim()); rest = rest.slice(cut + 1).trim();
+  }
+  if (rest) out.push(rest);
+  return out;
+}
+
+// Google's voice, played as an audio file. Resolves when done; rejects so the caller can fall back.
+function playGoogle(text, lang, rate){
+  const parts = chunkText(text, 180);
+  return new Promise((resolve, reject) => {
+    let i = 0, started = false;
+    const playNext = () => {
+      if (i >= parts.length) { cleanup(); resolve(); return; }
+      player.src = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=" + lang
+        + "&q=" + encodeURIComponent(parts[i++]);
+      player.playbackRate = rate;
+      const p = player.play();
+      if (p && p.catch) p.catch(err => { cleanup(); reject(err); });
+    };
+    const onEnded = () => { started = true; playNext(); };
+    const onError = () => { cleanup(); started ? resolve() : reject(new Error("audio failed")); };
+    function cleanup(){ player.removeEventListener("ended", onEnded); player.removeEventListener("error", onError); }
+    player.addEventListener("ended", onEnded);
+    player.addEventListener("error", onError);
+    playNext();
+  });
+}
+
+function speakDevice(text, lang, rate){
+  return new Promise(resolve => {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang; u.rate = rate;
+    const v = pickVoice(lang); if (v) u.voice = v;
+    let done = false;
+    const fin = () => { if (!done) { done = true; resolve(); } };
+    u.onend = fin; u.onerror = fin;
+    setTimeout(fin, 1500 + text.length * 110);
+    speechSynthesis.speak(u);
+  });
+}
+
 function unlockTTS(){
+  unlockPlayer();
   if (ttsUnlocked || !("speechSynthesis" in window)) return;
   const u = new SpeechSynthesisUtterance(" ");
   u.volume = 0;
@@ -444,7 +506,7 @@ function unlockTTS(){
 }
 
 function speak(seg){
-  if (!speakOn || !seg.tr || !("speechSynthesis" in window)) return;
+  if (!speakOn || !seg.tr) return;
   ttsQueue.push(seg);
   if (!ttsBusy) drainTTS();
 }
@@ -468,16 +530,17 @@ function drainTTS(){
   // Simultaneous mode leaves the mic running; the fallback releases it first (iOS can mute speech while recording).
   const release = !keepMic && listening && !pausedForTTS;
   if (release) { pausedForTTS = true; stopRec(); }
-  setTimeout(() => {
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = lang;
-    u.rate = behind ? 1.2 : 1.05;
-    const v = pickVoice(lang); if (v) u.voice = v;
-    let finished = false;
-    const next = () => { if (finished) return; finished = true; drainTTS(); };
-    u.onend = next; u.onerror = next;
-    setTimeout(next, 1500 + text.length * 110);   // some iOS versions never fire onend
-    speechSynthesis.speak(u);
+  const rate = behind ? 1.2 : 1.05;
+  const short = lang.slice(0, 2);
+  setTimeout(async () => {
+    if (keepMic) {
+      // iOS silences the built-in voice while the mic records, but keeps media audio playing.
+      try { await playGoogle(text, short, rate); }
+      catch { if ("speechSynthesis" in window) await speakDevice(text, lang, rate); }
+    } else if ("speechSynthesis" in window) {
+      await speakDevice(text, lang, rate);
+    }
+    drainTTS();
   }, release ? 400 : 0);
 }
 
@@ -507,7 +570,7 @@ $("keepMic").onchange = e => {
 $("speak").onchange = e => {
   speakOn = e.target.checked; savePrefs();
   if (speakOn) unlockTTS();
-  if (!speakOn && "speechSynthesis" in window) speechSynthesis.cancel();
+  if (!speakOn) { if ("speechSynthesis" in window) speechSynthesis.cancel(); player.pause(); ttsQueue = []; ttsBusy = false; }
 };
 
 $("clear").onclick = () => {
