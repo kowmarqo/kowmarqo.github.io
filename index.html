@@ -171,14 +171,52 @@ async function translate(text, f, t, partial, self, signal){
   if (apiKey) return claudeTranslate(buildPrompt(text, f, t, partial, self), signal);
   return googleTranslate(text, f, t, signal);
 }
+// Free engines, tried in order. Google's two unofficial endpoints, then MyMemory.
+// The last one that worked is tried first next time, so a blocked endpoint only costs one miss.
+let lastError = "";
+const FREE = [
+  { name: "Google", run: async (text, f, t, signal) => {
+      const r = await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=" + f + "&tl=" + t + "&q=" + encodeURIComponent(text), { signal });
+      if (!r.ok) throw new Error("Google " + r.status);
+      const j = await r.json();
+      const out = (j[0] || []).map(x => x[0]).join("");
+      if (!out) throw new Error("Google empty");
+      return out;
+  }},
+  { name: "Google (alt)", run: async (text, f, t, signal) => {
+      const r = await fetch("https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=" + f + "&tl=" + t + "&q=" + encodeURIComponent(text), { signal });
+      if (!r.ok) throw new Error("Google alt " + r.status);
+      const j = await r.json();
+      let out = "";
+      if (Array.isArray(j)) out = Array.isArray(j[0]) ? j[0][0] : j[0];
+      else if (j && j.sentences) out = j.sentences.map(x => x.trans || "").join("");
+      if (!out) throw new Error("Google alt empty");
+      return String(out);
+  }},
+  { name: "MyMemory", run: async (text, f, t, signal) => {
+      const r = await fetch("https://api.mymemory.translated.net/get?q=" + encodeURIComponent(text) + "&langpair=" + f + "|" + t, { signal });
+      if (!r.ok) throw new Error("MyMemory " + r.status);
+      const j = await r.json();
+      const out = j && j.responseData && j.responseData.translatedText;
+      if (!out || j.responseStatus >= 400) throw new Error("MyMemory " + (j.responseStatus || "empty"));
+      return out;
+  }}
+];
+let freeOrder = [0, 1, 2];
 async function googleTranslate(text, f, t, signal){
-  const url = "https://translate.googleapis.com/translate_a/single?client=gtx&dt=t"
-    + "&sl=" + f + "&tl=" + t + "&q=" + encodeURIComponent(text);
-  const r = await fetch(url, { signal });
-  if (r.status === 429) throw { code: "rate_limited" };
-  if (!r.ok) throw { code: "upstream_error" };
-  const j = await r.json();
-  return (j[0] || []).map(x => x[0]).join("");
+  const errs = [];
+  for (const idx of freeOrder.slice()) {
+    try {
+      const out = await FREE[idx].run(text, f, t, signal);
+      if (freeOrder[0] !== idx) { freeOrder = [idx, ...freeOrder.filter(i => i !== idx)]; paintEngine(); }
+      return out;
+    } catch (e) {
+      if (e && e.name === "AbortError") throw e;
+      errs.push(e && e.message ? e.message : "network error");
+    }
+  }
+  lastError = errs.join(" · ");
+  throw { code: "upstream_error" };
 }
 async function claudeTranslate(prompt, signal){
   const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -197,7 +235,7 @@ async function claudeTranslate(prompt, signal){
   const j = await r.json();
   return (j.content || []).filter(b => b.type === "text").map(b => b.text).join("");
 }
-function paintEngine(){ $("engine").textContent = apiKey ? "Claude" : "Google"; }
+function paintEngine(){ $("engine").textContent = apiKey ? "Claude" : FREE[freeOrder[0]].name; }
 
 try {
   const saved = JSON.parse(localStorage.getItem("lt-prefs") || "{}");
@@ -377,7 +415,7 @@ function paintSeg(seg){
   const old = el.querySelector(".retry");
   if (old) old.remove();
   if (seg.state === "failed") {
-    tr.textContent = "Translation didn't come through.";
+    tr.textContent = "Translation didn't come through." + (lastError ? " (" + lastError + ")" : "");
     const b = document.createElement("button");
     b.className = "retry"; b.textContent = "Translate again";
     b.onclick = () => { seg.tr = ""; translateFinal(seg); };
