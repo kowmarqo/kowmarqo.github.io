@@ -1,48 +1,486 @@
-<!DOCTYPE html>
-<html lang="en-us">
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Activity 1: Basic HTML Bio</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Live Ukrainian ⇄ English</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1F5;--surface:#FFFFFF;--ink:#132038;--muted:#56637D;--faint:#9AA4B6;
+  --blue:#2A5BD7;--blue-ink:#FFFFFF;--wheat:#E3AC24;--line:#D9DFE8;--danger:#B93A24;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1524;--surface:#16213A;--ink:#EDF1F8;--muted:#9AA6BE;--faint:#56627C;
+    --blue:#6F95FF;--blue-ink:#0D1524;--wheat:#F0BE45;--line:#233050;--danger:#FF8C72;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1524;--surface:#16213A;--ink:#EDF1F8;--muted:#9AA6BE;--faint:#56627C;
+  --blue:#6F95FF;--blue-ink:#0D1524;--wheat:#F0BE45;--line:#233050;--danger:#FF8C72;
+}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{
+  margin:0;height:100%;display:flex;flex-direction:column;
+  background:var(--bg);color:var(--ink);
+  font-family:Manrope,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,label:focus-within{outline:3px solid var(--wheat);outline-offset:2px}
+
+header{
+  width:100%;max-width:760px;margin:0 auto;padding:12px 16px 8px;
+  display:flex;align-items:center;gap:10px;
+}
+.dir{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.lang{
+  padding:7px 14px;border-radius:999px;font-weight:600;font-size:16px;white-space:nowrap;
+  background:var(--surface);border:1px solid var(--line);
+}
+.lang.from{border-color:var(--blue)}
+#swap{
+  width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface);
+  display:grid;place-items:center;flex:none;
+}
+#clear{background:none;border:none;color:var(--muted);font-size:14px;padding:8px}
+.pill{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:14px;color:var(--muted)}
+.settings{width:100%;max-width:760px;margin:0 auto;padding:4px 16px 14px;font-size:14px;line-height:1.5;color:var(--muted)}
+.settings[hidden]{display:none}
+.settings p{margin:0 0 10px;max-width:60ch}
+.settings input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:16px}
+.settings .row{display:flex;gap:8px;margin-top:10px}
+.settings .row button{padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface)}
+.settings .row .primary{background:var(--blue);color:var(--blue-ink);border-color:var(--blue)}
+
+main{flex:1;overflow-y:auto;width:100%;max-width:760px;margin:0 auto;padding:0 16px 16px}
+.empty{color:var(--muted);font-size:17px;line-height:1.5;padding:28px 4px;max-width:34ch}
+.seg{padding:14px 0 14px 14px;border-left:3px solid transparent;margin-left:-14px}
+.seg + .seg{border-top:1px solid var(--line)}
+.seg .tr{font-size:22px;line-height:1.35;font-weight:600;overflow-wrap:anywhere}
+.seg .src{font-size:15px;line-height:1.5;color:var(--muted);margin-top:6px;overflow-wrap:anywhere}
+.seg.live{border-left-color:var(--wheat)}
+.seg.live .tr:empty::before{content:"…";color:var(--faint)}
+.seg.provisional .tr{color:var(--muted)}
+.seg.failed .tr{color:var(--danger);font-size:16px;font-weight:500}
+.seg .retry{margin-top:6px;background:none;border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:14px}
+
+.notice{
+  width:100%;max-width:760px;margin:0 auto;padding:10px 16px;font-size:14px;line-height:1.45;
+  color:var(--ink);background:color-mix(in srgb,var(--wheat) 22%,var(--bg));
+}
+.notice[hidden]{display:none}
+
+footer{
+  width:100%;max-width:760px;margin:0 auto;padding:12px 16px 16px;
+  display:flex;align-items:center;gap:14px;border-top:1px solid var(--line);
+}
+#mic{
+  width:68px;height:68px;border-radius:50%;border:none;flex:none;position:relative;
+  background:var(--blue);color:var(--blue-ink);display:grid;place-items:center;
+}
+#mic[aria-pressed="true"]{background:var(--wheat);color:#132038}
+#mic[aria-pressed="true"]::after{
+  content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--wheat);
+  animation:ring 1.6s ease-out infinite;
+}
+@keyframes ring{from{opacity:.9;transform:scale(1)}to{opacity:0;transform:scale(1.25)}}
+@media (prefers-reduced-motion:reduce){#mic[aria-pressed="true"]::after{animation:none;opacity:.6}}
+#mic:disabled{opacity:.4;cursor:not-allowed}
+.side{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+#status{font-size:15px;font-weight:600}
+.toggle{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
+.toggle input{width:18px;height:18px;accent-color:var(--blue);margin:0}
+</style>
 </head>
-
 <body>
+<header>
+  <div class="dir" aria-live="polite">
+    <span class="lang from" id="fromLabel">Українська</span>
+    <button id="swap" aria-label="Swap languages" title="Swap languages">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 20 4-4-4-4"/><path d="M21 16H7"/></svg>
+    </button>
+    <span class="lang" id="toLabel">English</span>
+  </div>
+  <button id="engine" class="pill" title="Translation engine">Google</button>
+  <button id="clear">Clear</button>
+</header>
 
-  <h1>Your Name</h1>
+<div class="notice" id="notice" hidden></div>
+<div class="settings" id="settings" hidden>
+  <p>Google translation is free and needs no setup. For translation that handles context and messy speech better, paste an Anthropic API key. It stays on this device only.</p>
+  <input id="keyInput" type="password" autocomplete="off" placeholder="sk-ant-…" aria-label="Anthropic API key">
+  <div class="row"><button id="saveKey" class="primary">Use Claude</button><button id="clearKey">Use Google</button></div>
+</div>
 
-  <img src="https://placehold.it/200x200" alt="Your Name">
+<main id="list" aria-live="polite">
+  <p class="empty" id="empty">Tap the mic and start speaking. The translation appears while you talk and settles when each sentence ends.</p>
+</main>
 
-  <p>Write a short paragraph about yourself or some placeholder text.</p>
-  <p>A second short paragraph about yourself or some placeholder text.</p>
+<footer>
+  <button id="mic" aria-pressed="false" aria-label="Start listening">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v5"/></svg>
+  </button>
+  <div class="side">
+    <div id="status">Tap to start</div>
+    <label class="toggle"><input type="checkbox" id="speak"> Read translations aloud (mic pauses while speaking)</label>
+  </div>
+</footer>
 
-  <ul>
-    <li><strong>Email:</strong> <a href="#">someplace@gmail.com</a></li>
-    <li><strong>Github:</strong> <a href="#">sampleName</a></li>
-    <li><strong>Twitter:</strong> <a href="#">coming soon</a></li>
-  </ul>
+<script>
+const LANGS = {
+  uk: { code: "uk-UA", label: "Українська", name: "Ukrainian" },
+  en: { code: "en-US", label: "English", name: "English" }
+};
+let from = "uk", to = "en";
 
-  <table>
-    <tr>
-      <th>Books</th>
-      <th>Movies</th>
-      <th>Games</th>
-    </tr>
-    <tr>
-      <td>The Hobbit</td>
-      <td>Hot Fuzz</td>
-      <td>Dark Souls</td>
-    </tr>
-    <tr>
-      <td>The Name of the Wind</td>
-      <td>The Avengers</td>
-      <td>The Last of Us</td>
-    </tr>
-    <tr>
-      <td>The Girl With All the Gifts</td>
-      <td>The Matrix</td>
-      <td>Dragon Age: Origins</td>
-    </tr>
-  </table>
+const $ = id => document.getElementById(id);
+const listEl = $("list"), emptyEl = $("empty"), micBtn = $("mic"), statusEl = $("status"), noticeEl = $("notice");
 
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, listening = false, pausedForTTS = false, restartTimes = [];
+let translationOff = false, liveOff = false;
+let apiKey = "";
+try { apiKey = localStorage.getItem("lt-key") || ""; } catch {}
+let speakOn = false, speaking = 0;
+
+const segs = [];
+const live = { src: "", tr: "", asked: "", ctl: null, queued: false, el: null };
+
+/* ---------- setup ---------- */
+function notice(msg){ noticeEl.textContent = msg || ""; noticeEl.hidden = !msg; }
+function status(msg){ statusEl.textContent = msg; }
+
+if (!SR) {
+  micBtn.disabled = true;
+  status("Speech recognition unavailable");
+  notice("This browser can't recognize speech. Open this page in Chrome (Android or desktop) or Safari on iPhone.");
+}
+
+/* ---------- translation engines ---------- */
+// Google (no key, fast, literal) or Claude Haiku via your own API key (better with context and messy speech).
+async function translate(text, f, t, partial, self, signal){
+  if (apiKey) return claudeTranslate(buildPrompt(text, f, t, partial, self), signal);
+  return googleTranslate(text, f, t, signal);
+}
+async function googleTranslate(text, f, t, signal){
+  const url = "https://translate.googleapis.com/translate_a/single?client=gtx&dt=t"
+    + "&sl=" + f + "&tl=" + t + "&q=" + encodeURIComponent(text);
+  const r = await fetch(url, { signal });
+  if (r.status === 429) throw { code: "rate_limited" };
+  if (!r.ok) throw { code: "upstream_error" };
+  const j = await r.json();
+  return (j[0] || []).map(x => x[0]).join("");
+}
+async function claudeTranslate(prompt, signal){
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST", signal,
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 400, messages: [{ role: "user", content: prompt }] })
+  });
+  if (r.status === 401) throw { code: "bad_key" };
+  if (r.status === 429 || r.status === 529) throw { code: "rate_limited" };
+  if (!r.ok) throw { code: "upstream_error" };
+  const j = await r.json();
+  return (j.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+}
+function paintEngine(){ $("engine").textContent = apiKey ? "Claude" : "Google"; }
+
+try {
+  const saved = JSON.parse(localStorage.getItem("lt-prefs") || "{}");
+  if (saved.from === "en") { from = "en"; to = "uk"; }
+  if (saved.speak) { speakOn = true; $("speak").checked = true; }
+} catch {}
+function savePrefs(){ try { localStorage.setItem("lt-prefs", JSON.stringify({ from, speak: speakOn })); } catch {} }
+paintLangs();
+
+function paintLangs(){
+  $("fromLabel").textContent = LANGS[from].label;
+  $("toLabel").textContent = LANGS[to].label;
+  document.documentElement.lang = from;
+}
+
+/* ---------- speech recognition ---------- */
+function startRec(){
+  if (!SR) return;
+  rec = new SR();
+  rec.lang = LANGS[from].code;
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+
+  rec.onresult = e => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i], t = r[0].transcript;
+      if (r.isFinal) commitFinal(t); else interim += t;
+    }
+    setLive(interim.trim());
+  };
+  rec.onerror = e => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+      listening = false; paintMic();
+      status("Microphone blocked");
+      notice("The microphone is blocked for this page. Allow mic access in your browser settings, then tap the mic again.");
+    } else if (e.error === "language-not-supported") {
+      listening = false; paintMic();
+      notice(`This browser can't recognize ${LANGS[from].name} speech. Try Chrome.`);
+    } else if (e.error !== "no-speech" && e.error !== "aborted") {
+      status("Recognition hiccup: " + e.error);
+    }
+  };
+  rec.onend = () => {
+    if (!listening || pausedForTTS) return;
+    const now = Date.now();
+    restartTimes = restartTimes.filter(t => now - t < 10000);
+    if (restartTimes.length > 6) {
+      listening = false; paintMic();
+      status("Stopped: recognition keeps dropping");
+      return;
+    }
+    restartTimes.push(now);
+    try { startRec(); } catch {}
+  };
+  try { rec.start(); } catch {}
+}
+
+function stopRec(){
+  if (!rec) return;
+  const r = rec; rec = null;
+  r.onend = null;
+  try { r.stop(); } catch {}
+}
+
+function toggleListening(){
+  if (listening) {
+    listening = false;
+    stopRec();
+    if (live.src) commitFinal(live.src);
+  } else {
+    listening = true;
+    restartTimes = [];
+    notice(translationOff ? noticeEl.textContent : "");
+    startRec();
+  }
+  paintMic();
+}
+
+function paintMic(){
+  micBtn.setAttribute("aria-pressed", String(listening));
+  micBtn.setAttribute("aria-label", listening ? "Stop listening" : "Start listening");
+  status(listening ? `Listening in ${LANGS[from].name}` : "Tap to start");
+}
+
+/* ---------- live (interim) text ---------- */
+function setLive(text){
+  if (text === live.src) return;
+  live.src = text;
+  if (!text) { live.tr = ""; live.asked = ""; }
+  renderLive();
+  maybeTranslateLive();
+}
+
+function maybeTranslateLive(){
+  if (translationOff || liveOff || !live.src) return;
+  if (live.src === live.asked) return;
+  if (live.src.split(/\s+/).length < 2) return;
+  if (live.ctl) { live.queued = true; return; }   // one call at a time; newest text goes next
+  runLive(live.src);
+}
+
+function runLive(text){
+  live.asked = text;
+  live.queued = false;
+  const ctl = new AbortController();
+  live.ctl = ctl;
+  translate(text, from, to, true, null, ctl.signal).then(r => {
+    if (live.asked === text && live.src) { live.tr = clean(r); renderLive(); }
+  }).catch(handleError).finally(() => {
+    if (live.ctl === ctl) live.ctl = null;
+    if (live.queued && live.src) maybeTranslateLive();
+  });
+}
+
+function renderLive(){
+  if (!live.src) { if (live.el) { live.el.remove(); live.el = null; } updateEmpty(); return; }
+  if (!live.el) {
+    live.el = makeSegEl();
+    live.el.classList.add("live");
+    listEl.appendChild(live.el);
+  }
+  live.el.querySelector(".tr").textContent = translationOff ? "" : live.tr;
+  live.el.querySelector(".src").textContent = live.src;
+  updateEmpty();
+  autoscroll();
+}
+
+/* ---------- finished sentences ---------- */
+function commitFinal(text){
+  text = text.trim();
+  if (!text) return;
+  const seg = { src: text, tr: "", from, to, state: "pending", el: makeSegEl() };
+  // Keep the live translation on screen while the final one arrives, to avoid a blank flash.
+  if (live.tr && !translationOff) { seg.tr = live.tr; seg.state = "provisional"; }
+  if (live.ctl) live.ctl.abort();
+  live.ctl = null; live.src = ""; live.tr = ""; live.asked = ""; live.queued = false;
+  if (live.el) { live.el.remove(); live.el = null; }
+  segs.push(seg);
+  listEl.appendChild(seg.el);
+  paintSeg(seg);
+  translateFinal(seg);
+}
+
+function translateFinal(seg){
+  if (translationOff) { seg.state = "done"; paintSeg(seg); return; }
+  seg.state = seg.tr ? "provisional" : "pending";
+  paintSeg(seg);
+  translate(seg.src, seg.from, seg.to, false, seg).then(r => {
+    seg.tr = clean(r); seg.state = "done"; paintSeg(seg);
+    speak(seg);
+  }).catch(e => {
+    handleError(e);
+    if (!(e && (e.code === "cancelled" || e.name === "AbortError"))) { seg.state = "failed"; paintSeg(seg); }
+  });
+}
+
+function makeSegEl(){
+  const el = document.createElement("div");
+  el.className = "seg";
+  el.innerHTML = '<div class="tr"></div><div class="src"></div>';
+  return el;
+}
+
+function paintSeg(seg){
+  const el = seg.el;
+  el.className = "seg " + seg.state;
+  el.querySelector(".src").textContent = seg.src;
+  const tr = el.querySelector(".tr");
+  const old = el.querySelector(".retry");
+  if (old) old.remove();
+  if (seg.state === "failed") {
+    tr.textContent = "Translation didn't come through.";
+    const b = document.createElement("button");
+    b.className = "retry"; b.textContent = "Translate again";
+    b.onclick = () => { seg.tr = ""; translateFinal(seg); };
+    el.appendChild(b);
+  } else {
+    tr.textContent = translationOff ? "" : seg.tr;
+  }
+  updateEmpty();
+  autoscroll();
+}
+
+/* ---------- prompt ---------- */
+function buildPrompt(text, f, t, partial, self){
+  const A = LANGS[f].name, B = LANGS[t].name;
+  const ctx = segs.filter(s => s.state === "done" && s !== self && s.tr).slice(-3)
+    .map(s => `${LANGS[s.from].name}: ${s.src}\n${LANGS[s.to].name}: ${s.tr}`).join("\n\n");
+  return [
+    `You are a live interpreter translating spoken ${A} into ${B}.`,
+    `The input is raw speech-recognition output: it may lack punctuation and contain misheard words.`,
+    partial ? `The speaker is still talking, so the text may stop mid-sentence. Translate only what is there; do not finish the sentence.` : ``,
+    `Translate naturally and faithfully. Fix an obvious recognition error only when the context makes the intended word clear. Keep names as spoken.`,
+    `Reply with only the ${B} translation: no quotes, labels, or notes.`,
+    ctx ? `\nEarlier in this conversation, for context only (do not translate these again):\n${ctx}` : ``,
+    `\nText to translate:\n${text}`
+  ].filter(Boolean).join("\n");
+}
+function clean(t){ return String(t || "").trim().replace(/^["“«]|["”»]$/g, ""); }
+
+/* ---------- errors ---------- */
+function handleError(e){
+  if (e && e.name === "AbortError") return;
+  const code = e && e.code;
+  if (code === "cancelled") return;
+  if (code === "bad_key") {
+    notice("Claude rejected the API key. Tap the engine button to fix it, or clear it to use Google.");
+  } else if (code === "rate_limited") {
+    if (!liveOff) {
+      liveOff = true;
+      notice("Hit the request limit. The live preview is paused for 30 seconds; finished sentences still translate.");
+      setTimeout(() => { liveOff = false; notice(""); }, 30000);
+    }
+  } else if (!navigator.onLine) {
+    notice("You're offline. Translation needs a connection.");
+  }
+}
+
+/* ---------- text to speech ---------- */
+function pickVoice(langCode){
+  const voices = speechSynthesis.getVoices();
+  const base = langCode.slice(0, 2);
+  return voices.find(v => v.lang === langCode) || voices.find(v => v.lang && v.lang.startsWith(base)) || null;
+}
+function speak(seg){
+  if (!speakOn || !seg.tr || !("speechSynthesis" in window)) return;
+  const u = new SpeechSynthesisUtterance(seg.tr);
+  u.lang = LANGS[seg.to].code;
+  const v = pickVoice(u.lang); if (v) u.voice = v;
+  if (speaking === 0 && listening) { pausedForTTS = true; stopRec(); }
+  speaking++;
+  const done = () => {
+    speaking = Math.max(0, speaking - 1);
+    if (speaking === 0 && pausedForTTS) { pausedForTTS = false; if (listening) startRec(); }
+  };
+  u.onend = done; u.onerror = done;
+  speechSynthesis.speak(u);
+}
+
+/* ---------- misc UI ---------- */
+function updateEmpty(){ emptyEl.hidden = segs.length > 0 || !!live.src; }
+function autoscroll(){
+  const nearBottom = listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight < 160;
+  if (nearBottom) listEl.scrollTop = listEl.scrollHeight;
+}
+
+micBtn.onclick = toggleListening;
+
+$("swap").onclick = () => {
+  const was = listening;
+  if (was) { listening = false; stopRec(); if (live.src) commitFinal(live.src); }
+  [from, to] = [to, from];
+  paintLangs(); savePrefs();
+  if (was) { listening = true; restartTimes = []; startRec(); }
+  paintMic();
+};
+
+$("speak").onchange = e => {
+  speakOn = e.target.checked; savePrefs();
+  if (!speakOn && "speechSynthesis" in window) speechSynthesis.cancel();
+};
+
+$("clear").onclick = () => {
+  segs.splice(0).forEach(s => s.el.remove());
+  if (live.ctl) live.ctl.abort();
+  live.src = ""; live.tr = ""; live.asked = ""; renderLive();
+};
+
+if ("speechSynthesis" in window) speechSynthesis.getVoices();
+
+$("engine").onclick = () => { $("settings").hidden = !$("settings").hidden; $("keyInput").value = apiKey; };
+$("saveKey").onclick = () => {
+  apiKey = $("keyInput").value.trim();
+  try { apiKey ? localStorage.setItem("lt-key", apiKey) : localStorage.removeItem("lt-key"); } catch {}
+  $("settings").hidden = true; paintEngine(); notice("");
+};
+$("clearKey").onclick = () => {
+  apiKey = ""; try { localStorage.removeItem("lt-key"); } catch {}
+  $("settings").hidden = true; paintEngine(); notice("");
+};
+paintEngine();
+if (!window.isSecureContext) notice("Open this page over https (or as a local file in Chrome) so the browser can use the microphone.");
+</script>
 </body>
-
 </html>
