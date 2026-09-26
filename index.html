@@ -130,7 +130,8 @@ footer{
   </button>
   <div class="side">
     <div id="status">Tap to start</div>
-    <label class="toggle"><input type="checkbox" id="speak"> Read translations aloud (mic pauses while speaking)</label>
+    <label class="toggle"><input type="checkbox" id="speak"> Read translations aloud</label>
+    <label class="toggle"><input type="checkbox" id="keepMic" checked> Keep listening while it speaks (use headphones)</label>
   </div>
 </footer>
 
@@ -230,6 +231,11 @@ function startRec(){
     setLive(interim.trim());
   };
   rec.onerror = e => {
+    if ((e.error === "not-allowed" || e.error === "service-not-allowed") && resumingAfterTTS) {
+      listening = false; paintMic();
+      status("Tap the mic to keep listening");
+      return;
+    }
     if (e.error === "not-allowed" || e.error === "service-not-allowed") {
       listening = false; paintMic();
       status("Microphone blocked");
@@ -268,6 +274,7 @@ function toggleListening(){
     listening = false;
     stopRec();
     if (live.src) commitFinal(live.src);
+    pausedForTTS = false;
   } else {
     listening = true;
     restartTimes = [];
@@ -423,19 +430,55 @@ function pickVoice(langCode){
   const base = langCode.slice(0, 2);
   return voices.find(v => v.lang === langCode) || voices.find(v => v.lang && v.lang.startsWith(base)) || null;
 }
+let ttsUnlocked = false, ttsQueue = [], ttsBusy = false, resumingAfterTTS = false;
+let keepMic = true;
+try { const k = localStorage.getItem("lt-keepmic"); if (k === "0") keepMic = false; } catch {}
+
+// iOS only lets a page speak after speech has started from a tap, so prime it silently on the first tap.
+function unlockTTS(){
+  if (ttsUnlocked || !("speechSynthesis" in window)) return;
+  const u = new SpeechSynthesisUtterance(" ");
+  u.volume = 0;
+  speechSynthesis.speak(u);
+  ttsUnlocked = true;
+}
+
 function speak(seg){
   if (!speakOn || !seg.tr || !("speechSynthesis" in window)) return;
-  const u = new SpeechSynthesisUtterance(seg.tr);
-  u.lang = LANGS[seg.to].code;
-  const v = pickVoice(u.lang); if (v) u.voice = v;
-  if (speaking === 0 && listening) { pausedForTTS = true; stopRec(); }
-  speaking++;
-  const done = () => {
-    speaking = Math.max(0, speaking - 1);
-    if (speaking === 0 && pausedForTTS) { pausedForTTS = false; if (listening) startRec(); }
-  };
-  u.onend = done; u.onerror = done;
-  speechSynthesis.speak(u);
+  ttsQueue.push(seg);
+  if (!ttsBusy) drainTTS();
+}
+
+function drainTTS(){
+  if (!ttsQueue.length) {
+    ttsBusy = false;
+    if (pausedForTTS) {
+      pausedForTTS = false;
+      if (listening) { resumingAfterTTS = true; startRec(); setTimeout(() => { resumingAfterTTS = false; }, 1500); }
+    }
+    return;
+  }
+  ttsBusy = true;
+  // If sentences piled up while speaking, say them together and a little faster so it doesn't fall behind.
+  const batch = ttsQueue.splice(0);
+  const text = batch.map(x => x.tr).join(" ");
+  const lang = LANGS[batch[batch.length - 1].to].code;
+  const behind = batch.length > 1;
+
+  // Simultaneous mode leaves the mic running; the fallback releases it first (iOS can mute speech while recording).
+  const release = !keepMic && listening && !pausedForTTS;
+  if (release) { pausedForTTS = true; stopRec(); }
+  setTimeout(() => {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang;
+    u.rate = behind ? 1.2 : 1.05;
+    const v = pickVoice(lang); if (v) u.voice = v;
+    let finished = false;
+    const next = () => { if (finished) return; finished = true; drainTTS(); };
+    u.onend = next; u.onerror = next;
+    setTimeout(next, 1500 + text.length * 110);   // some iOS versions never fire onend
+    speechSynthesis.speak(u);
+  }, release ? 400 : 0);
 }
 
 /* ---------- misc UI ---------- */
@@ -445,7 +488,7 @@ function autoscroll(){
   if (nearBottom) listEl.scrollTop = listEl.scrollHeight;
 }
 
-micBtn.onclick = toggleListening;
+micBtn.onclick = () => { if (speakOn) unlockTTS(); toggleListening(); };
 
 $("swap").onclick = () => {
   const was = listening;
@@ -456,8 +499,14 @@ $("swap").onclick = () => {
   paintMic();
 };
 
+$("keepMic").checked = keepMic;
+$("keepMic").onchange = e => {
+  keepMic = e.target.checked;
+  try { localStorage.setItem("lt-keepmic", keepMic ? "1" : "0"); } catch {}
+};
 $("speak").onchange = e => {
   speakOn = e.target.checked; savePrefs();
+  if (speakOn) unlockTTS();
   if (!speakOn && "speechSynthesis" in window) speechSynthesis.cancel();
 };
 
